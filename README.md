@@ -8,7 +8,7 @@ Download All IGCSE Past Papers And Mark Schemes Of Any Subject
 
 ## Requirements
 ```
-pip install PyPDF2 requests beautifulsoup4
+pip install -r requirements.txt
 ```
 
 ## How To Download
