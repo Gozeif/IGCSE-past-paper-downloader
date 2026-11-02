@@ -1,5 +1,6 @@
 """Configurations For IGCSE Past Papers Downloader (dynamicpapers.com)"""
 import os
+import sys
 from dotenv import load_dotenv
 
 HEADERS = {
@@ -50,8 +51,13 @@ EDEXCEL_CODES = {
     "4PM1": ["further pure mathematics"],
     "4SP1": ["spanish"],
 }
+# Folder of the script, or of the .exe when built with PyInstaller
+if getattr(sys, "frozen", False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # Subject pages are password protected. You can override this with the
 # Set DYNAMICPAPERS_PASSWORD, or leave it unset to be prompted.
@@ -64,7 +70,7 @@ QUESTION_PAPERS_FOLDER = "question_papers"
 MERGED_FOLDER = "MERGED"
 MERGED_FILE = "merged.pdf"
 MERGED_TEMP_FILE = "merged_temp.pdf"
-DEBUG_HTML_FILE = "debug_page.html"
+DEBUG_HTML_FILE = os.path.join(BASE_DIR, "debug_page.html")
 
 # --- Filtering ----------------------------------------------------------
 # File-name types that are skipped (examiner reports, grade thresholds, ...)
