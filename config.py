@@ -64,7 +64,7 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 SITE_PASSWORD = os.environ.get("DYNAMICPAPERS_PASSWORD")
 
 # --- Folders / files ----------------------------------------------------
-DATA_FOLDER = "data"
+DATA_FOLDER = os.path.join(BASE_DIR, "IGCSE downloads")
 MARK_SCHEME_FOLDER = "mark_scheme"
 QUESTION_PAPERS_FOLDER = "question_papers"
 MERGED_FOLDER = "MERGED"
