@@ -5,13 +5,15 @@ import bs4
 from pypdf import PdfReader, PdfWriter
 import config
 
-def mkdir(name):
-    """Makes a dir if that dir does not exist"""
-    try:
-        os.mkdir(name)
-    except FileExistsError:
-        pass
 
+def mkdir(name):
+    """Makes a dir (and parents) if that dir does not exist"""
+    os.makedirs(name, exist_ok=True)
+
+
+def folder_name(paper_code):
+    """Turns what the user typed into a safe folder name"""
+    return re.sub(r"[^\w.-]+", "_", paper_code.strip()).strip("_") or "papers"
 def get_paper_data(paper_name):
     """Gets paper code and paper type based on paper name"""
     split = paper_name.split("_")
