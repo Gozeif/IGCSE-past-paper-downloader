@@ -1,6 +1,7 @@
 """IGCSE Past Papers Downloader"""
 import os
 import re
+from urllib.parse import urljoin, urlparse
 
 import requests
 import bs4
@@ -112,36 +113,6 @@ def get_data_from_user():
 
     return paper_code, start_year, end_year, to_filter
 
-def get_subject_url(paper_code):
-    """Gets Subject's URL Based On Subject Code"""
-    html_data = requests.get(config.BASE_URL, headers=config.HEADERS).content
-    soup = bs4.BeautifulSoup(html_data, 'lxml')
-    div = soup.find("div", attrs={"class":"entry clr", "itemprop" : "text"})
-    subjects = div.findAll("p")
-
-    for subject in subjects:
-        if paper_code in subject.getText():
-            return subject.find("a").get("href")
-
-    raise Exception("Invalid Paper Code")
-
-def get_each_years_url(subject_url, start_year, end_year):
-    """Returns each years url from start year to end year of a subject"""
-    output = []
-    html_data = requests.get(subject_url, headers=config.HEADERS).content
-    soup = bs4.BeautifulSoup(html_data, 'lxml')
-    div = soup.find("div", attrs={"class":"entry clr", "itemprop" : "text"})
-    years_to_get = list(range(start_year, end_year + 1))
-    years = div.findAll("p")
-
-    for year in years:
-        try:
-            link = year.find("a").get("href")
-            if any([str(year_to_get) in link and "past-papers" in link
-                    for year_to_get in years_to_get]):
-                output.append(link)
-        except AttributeError:
-            pass
 
 # --------------------------------------------------------------------------
 # Site access
@@ -188,6 +159,98 @@ def get_page(url):
     return soup
 
 
+# --------------------------------------------------------------------------
+# Finding the subject (any board)
+# --------------------------------------------------------------------------
+def parse_subjects(soup):
+    """Reads every subject link out of the site menu"""
+    subjects = {}
+    for link in soup.find_all("a", href=True):
+        url = urljoin(config.SITE_URL, link["href"])
+        path = urlparse(url).path.rstrip("/")
+        board = next((name for name, prefix in config.BOARD_PATHS.items()
+                      if prefix in url and path != prefix.rstrip("/")), None)
+        if board is None:
+            continue
+
+        item = link.find_parent("li")
+        if item is not None and item.find("ul") is not None:
+            continue  # a menu category (has sub-items), not a subject
+
+        parts = []
+        for parent in reversed(link.find_parents("li")):
+            anchor = parent.find("a")
+            if anchor is not None:
+                parts.append(anchor.get_text(" ", strip=True))
+
+        subjects[url] = {
+            "board": board,
+            "name": link.get_text(" ", strip=True),
+            "label": " > ".join(parts),
+            "url": url,
+        }
+    return list(subjects.values())
+
+
+def find_subjects(query, subjects):
+    """Subjects whose title contains the code; else (Edexcel codes) subjects
+    with the mapped menu name; else subjects whose menu path has all words"""
+    query = query.strip()
+    if not query:
+        return []
+
+    pattern = re.compile(
+        r"(?<![A-Za-z0-9])" + re.escape(query) + r"(?![A-Za-z0-9])",
+        re.IGNORECASE)
+    matches = [s for s in subjects if pattern.search(s["name"])]
+    if matches:
+        return matches
+
+    names = config.EDEXCEL_CODES.get(query.upper())
+    if names:
+        return [s for s in subjects
+                if s["board"].startswith("Edexcel")
+                and "o level" in s["label"].lower()
+                and s["name"].lower() in names]
+
+    words = query.lower().split()
+    return [s for s in subjects
+            if all(word in s["label"].lower() for word in words)]
+
+
+def choose_subjects(matches):
+    """Lets the user pick when several subjects match"""
+    if len(matches) == 1:
+        print("Using: {} ({})".format(matches[0]["label"], matches[0]["url"]))
+        return matches
+    if len(matches) > 40:
+        raise Exception("{} subjects match - be more specific "
+                        "(a code or a longer name)".format(len(matches)))
+
+    print("Several subjects match:")
+    for number, subject in enumerate(matches, 1):
+        print("  [{}] {}".format(number, subject["label"]))
+    answer = input("Pick number(s) separated by commas, or 'all': ")
+    if answer.strip().lower() == "all":
+        return matches
+
+    chosen = []
+    for part in answer.split(","):
+        part = part.strip()
+        if part.isdigit() and 1 <= int(part) <= len(matches):
+            chosen.append(matches[int(part) - 1])
+    if not chosen:
+        raise Exception("No valid selection")
+    return chosen
+
+
+def get_subject_urls(paper_code):
+    """Finds the page(s) of a subject from a code or name"""
+    soup = _soup(fetch(config.SITE_URL).content)
+    matches = find_subjects(paper_code, parse_subjects(soup))
+    if not matches:
+        raise Exception("Invalid Paper Code")
+    return [subject["url"] for subject in choose_subjects(matches)]
 
 def get_papers_urls(year_url):
     """return all papers' url from a year url"""
