@@ -64,6 +64,7 @@ QUESTION_PAPERS_FOLDER = "question_papers"
 MERGED_FOLDER = "MERGED"
 MERGED_FILE = "merged.pdf"
 MERGED_TEMP_FILE = "merged_temp.pdf"
+DEBUG_HTML_FILE = "debug_page.html"
 
 # --- Filtering ----------------------------------------------------------
 # File-name types that are skipped (examiner reports, grade thresholds, ...)

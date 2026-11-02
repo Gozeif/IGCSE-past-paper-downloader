@@ -1,7 +1,7 @@
 """IGCSE Past Papers Downloader"""
 import os
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 import bs4
@@ -40,21 +40,6 @@ def mkdir(name):
 def folder_name(paper_code):
     """Turns what the user typed into a safe folder name"""
     return re.sub(r"[^\w.-]+", "_", paper_code.strip()).strip("_") or "papers"
-def get_paper_data(paper_name):
-    """Gets paper code and paper type based on paper name"""
-    split = paper_name.split("_")
-    code = split[-1]
-    paper_type = split[-2]
-
-    if len(split) == 5:
-        code = split[-2] + split[-3]
-        paper_type = split[-1]
-
-    elif len(split) == 3:
-        code = "00"
-        paper_type = split[-1]
-
-    return code, paper_type
 
 def pdf_merge(folder):
     """Merges all pdfs in a folder (in name order) and returns the writer"""
@@ -252,20 +237,6 @@ def get_subject_urls(paper_code):
         raise Exception("Invalid Paper Code")
     return [subject["url"] for subject in choose_subjects(matches)]
 
-def get_papers_urls(year_url):
-    """return all papers' url from a year url"""
-    papers_urls = {}
-    html_data = requests.get(year_url, headers=config.HEADERS).content
-    soup = bs4.BeautifulSoup(html_data, 'lxml')
-    div = soup.find("div", attrs={"class":"entry-content clr", "itemprop" : "text"})
-    papers = div.findAll("p")
-
-    for paper in papers:
-        if " " not in paper.getText():
-            papers_urls[paper.getText()] = paper.find("a").get("href")
-
-    return papers_urls
-
 def download_papers(paper_code, years_urls, to_filter):
     """Download all papers from a dict of paper urls"""
     for year_url in years_urls:
@@ -312,6 +283,143 @@ def filter_papers(papers_urls, to_filter):
     for paper_name, paper_url in papers_urls.items():
         season = paper_name.split("_")[1][0]
         code, paper_type = get_paper_data(paper_name)
+# --------------------------------------------------------------------------
+# Reading papers off a subject page
+# --------------------------------------------------------------------------
+def _year_from_yy(yy):
+    yy = int(yy)
+    return 2000 + yy if yy < 70 else 1900 + yy
+
+
+def _paper(stem, url, year, season, paper_type, variant):
+    return {
+        "name": stem,
+        "url": url,
+        "year": year,
+        "season": season,
+        "type": paper_type,
+        "variant": variant,
+        "folder": (config.MARK_SCHEME_FOLDER if paper_type == "ms"
+                   else config.QUESTION_PAPERS_FOLDER),
+    }
+
+
+def _context_year(link):
+    """Year from the closest heading above a link (for pages that group
+    papers under year headings)"""
+    heading = link.find_previous(
+        lambda tag: tag.name in HEADING_TAGS and YEAR_RE.search(
+            tag.get_text()))
+    if heading is None:
+        return None
+    year_match = YEAR_RE.search(heading.get_text())
+    return int(year_match.group()) if year_match else None
+
+
+def parse_paper(url, text, link=None):
+    """Works out year/season/type of a pdf link, or None if there is no year.
+    Understands CIE and Edexcel file names, else guesses from name and text."""
+    stem = os.path.splitext(os.path.basename(unquote(urlparse(url).path)))[0]
+
+    match = CIE_RE.fullmatch(stem)
+    if match:
+        return _paper(stem, url, _year_from_yy(match["yy"]),
+                      match["season"].lower(), match["type"].lower(),
+                      match["variant"] or "")
+
+    match = EDEXCEL_RE.match(stem)
+    if match:
+        year, month = int(match["date"][:4]), int(match["date"][4:6])
+        if 1990 <= year <= 2100 and 1 <= month <= 12:
+            kind = match["type"].lower()
+            return _paper(stem, url, year, NUMBER_SEASON[month],
+                          EDEXCEL_TYPES.get(kind, kind), match["paper"])
+
+    # Unknown naming (e.g. AQA): guess from the file name and the link text
+    haystack = "{} {}".format(stem, text).lower()
+    month = re.search(MONTH_RE, haystack)
+
+    year = None
+    found = YEAR_RE.search(haystack)
+    if found:
+        year = int(found.group())
+    elif month:
+        short = re.search(MONTH_RE + r"[\s_-]?(\d{2})(?!\d)", haystack)
+        if short:
+            year = _year_from_yy(short.group(2))
+    if year is None and link is not None:
+        year = _context_year(link)
+    if year is None:
+        return None
+
+    season = MONTH_SEASON[month.group(1)[:3]] if month else "x"
+
+    paper_type = "ms" if re.search(
+        r"(?<![a-z])(ms|rms|msc|mark ?scheme|markscheme|marking)(?![a-z])",
+        haystack) else "qp"
+    for banned in config.BANNED_PAPER_TYPES:
+        if re.search(r"(?<![a-z])" + banned + r"(?![a-z])", haystack):
+            paper_type = banned
+            break
+
+    return _paper(stem, url, year, season, paper_type, "")
+
+
+def collect_papers(soup, base_url, start_year, end_year):
+    """Returns {name: paper} for every pdf linked on a page whose year is in
+    range"""
+    found, unknown = {}, []
+    for link in soup.find_all("a", href=True):
+        url = urljoin(base_url, link["href"])
+        if not urlparse(url).path.lower().endswith(".pdf"):
+            continue
+
+        paper = parse_paper(url, link.get_text(" ", strip=True), link)
+        if paper is None:
+            unknown.append(url)
+        elif start_year <= paper["year"] <= end_year:
+            found[paper["name"]] = paper
+
+    if unknown:
+        print("  note: {} pdf link(s) had no recognizable year, e.g. {}".format(
+            len(unknown), unknown[0]))
+    return found
+
+
+def get_papers(subject_url, start_year, end_year):
+    """Returns all papers of a subject between start and end year"""
+    soup = get_page(subject_url)
+    papers = collect_papers(soup, subject_url, start_year, end_year)
+
+    if not papers:
+        # Maybe the subject page only links to per-year pages: follow those
+        seen = {subject_url}
+        for link in soup.find_all("a", href=True):
+            href = link.get("href")
+            if not isinstance(href, str):
+                continue
+            url = urljoin(subject_url, href)
+            if url in seen or not url.startswith(subject_url):
+                continue
+            seen.add(url)
+
+            year = YEAR_RE.search(link.get_text()) or YEAR_RE.search(url)
+            if year and not start_year <= int(year.group()) <= end_year:
+                continue
+            papers.update(collect_papers(get_page(url), url,
+                                         start_year, end_year))
+
+    if not papers:
+        with open(config.DEBUG_HTML_FILE, "w", encoding="utf-8") as file:
+            file.write(str(soup))
+        raise Exception(
+            "No papers found in {}. The page layout may differ from what the "
+            "script expects - see {}".format(subject_url,
+                                             config.DEBUG_HTML_FILE))
+
+    return papers
+
+
 
         if code not in to_filter[season] and paper_type not in config.BANNED_PAPER_TYPES:
             output[paper_name] = paper_url
