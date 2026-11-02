@@ -2,8 +2,7 @@
 import os
 import requests
 import bs4
-
-from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
+from pypdf import PdfReader, PdfWriter
 import config
 
 def mkdir(name):
@@ -30,32 +29,39 @@ def get_paper_data(paper_name):
     return code, paper_type
 
 def pdf_merge(folder):
-    """Merges all pdfs in a folder and returnes merged file"""
-    pdfs = [f for f in os.listdir(folder)
-            if os.path.isfile(os.path.join(folder, f))]
+    """Merges all pdfs in a folder (in name order) and returns the writer"""
+    pdfs = sorted(f for f in os.listdir(folder)
+                  if os.path.isfile(os.path.join(folder, f)))
 
-    merger = PdfFileMerger()
+    merger = PdfWriter()
 
     for pdf in pdfs:
-        merger.append("{}/{}".format(folder, pdf))
+        merger.append(os.path.join(folder, pdf))
 
     return merger
 
+
+def is_blank_page(page):
+    """True if the page says BLANK PAGE. If the text can't be read, the page
+    is kept (some PDFs have malformed fonts that crash text extraction)."""
+    try:
+        return "BLANK PAGE" in (page.extract_text() or "")
+    except Exception:  # pylint: disable=broad-except
+        return False
+
+
 def remove_blank_pages(input_file_name, output_file_name):
     """Removes all blank pages from a pdf"""
-    input_file = open(input_file_name, "rb")
-    reader = PdfFileReader(input_file)
-    writer = PdfFileWriter()
+    with open(input_file_name, "rb") as input_file:
+        reader = PdfReader(input_file)
+        writer = PdfWriter()
 
-    for page_number in range(reader.getNumPages()):
-        page = reader.getPage(page_number)
-        if "BLANK PAGE" not in page.extractText():
-            writer.addPage(page)
+        for page in reader.pages:
+            if not is_blank_page(page):
+                writer.add_page(page)
 
-    output_file = open(output_file_name, "wb")
-    writer.write(output_file)
-    input_file.close()
-    output_file.close()
+        with open(output_file_name, "wb") as output_file:
+            writer.write(output_file)
 
 
 def get_data_from_user():
