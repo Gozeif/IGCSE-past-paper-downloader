@@ -237,52 +237,6 @@ def get_subject_urls(paper_code):
         raise Exception("Invalid Paper Code")
     return [subject["url"] for subject in choose_subjects(matches)]
 
-def download_papers(paper_code, years_urls, to_filter):
-    """Download all papers from a dict of paper urls"""
-    for year_url in years_urls:
-        papers_urls = get_papers_urls(year_url)
-        papers_urls = filter_papers(papers_urls, to_filter)
-
-        question_papers_folder = "{}/{}/{}".format(
-            config.DATA_FOLDER,
-            paper_code,
-            config.QUESTION_PAPERS_FOLDER
-        )
-
-        mkdir(question_papers_folder)
-        mkdir("{}/{}/{}".format(config.DATA_FOLDER, paper_code, config.MARK_SCHEME_FOLDER))
-        num = len(os.listdir(question_papers_folder))
-
-        for paper_name, paper_url in papers_urls.items():
-            _, paper_type = get_paper_data(paper_name)
-            print("Downloading {}".format(paper_name))
-
-            if paper_type != "ms":
-                folder = config.QUESTION_PAPERS_FOLDER
-            else:
-                folder = config.MARK_SCHEME_FOLDER
-
-            data = requests.get(paper_url, headers=config.HEADERS).content
-
-            name = "{}/{}/{}/{}_{}.pdf".format(config.DATA_FOLDER,
-                                               paper_code,
-                                               folder,
-                                               num,
-                                               paper_name)
-            with open(name+"_temp", "wb") as file:
-                file.write(data)
-
-            remove_blank_pages(name+"_temp", name)
-            os.remove(name+"_temp")
-
-
-def filter_papers(papers_urls, to_filter):
-    """Filters papers"""
-    output = {}
-
-    for paper_name, paper_url in papers_urls.items():
-        season = paper_name.split("_")[1][0]
-        code, paper_type = get_paper_data(paper_name)
 # --------------------------------------------------------------------------
 # Reading papers off a subject page
 # --------------------------------------------------------------------------
@@ -420,23 +374,82 @@ def get_papers(subject_url, start_year, end_year):
     return papers
 
 
+# --------------------------------------------------------------------------
+# Download
+# --------------------------------------------------------------------------
+def filter_papers(papers, to_filter):
+    """Drops banned paper types and the variant codes the user excluded"""
+    output = {}
 
-        if code not in to_filter[season] and paper_type not in config.BANNED_PAPER_TYPES:
-            output[paper_name] = paper_url
+    for name, paper in papers.items():
+        if paper["type"] in config.BANNED_PAPER_TYPES:
+            continue
+        excluded = [c.lower() for c in to_filter.get(paper["season"], [])]
+        if paper["variant"].lower() in excluded:
+            continue
+        output[name] = paper
 
     return output
+
+
+def download_papers(paper_code, papers):
+    """Downloads all papers (a dict of paper dicts)"""
+    base = os.path.join(config.DATA_FOLDER, folder_name(paper_code))
+    mkdir(os.path.join(base, config.QUESTION_PAPERS_FOLDER))
+    mkdir(os.path.join(base, config.MARK_SCHEME_FOLDER))
+
+    # Oldest first. Season letters sort chronologically (j < m < s < r < w).
+    ordered = sorted(papers.values(),
+                     key=lambda p: (p["year"], p["season"], p["name"]))
+
+    for paper in ordered:
+        safe_name = re.sub(r'[<>:"/\\|?*\s]+', "_", paper["name"])
+        name = os.path.join(base, paper["folder"],
+                            "{}_{}.pdf".format(paper["year"], safe_name))
+
+        if os.path.exists(name):
+            print("Skipping {} (already downloaded)".format(paper["name"]))
+            continue
+
+        print("Downloading {}".format(paper["name"]))
+        response = fetch(paper["url"])
+        if response.status_code != 200 or not response.content.startswith(b"%PDF"):
+            print("  failed (HTTP {}), skipping".format(response.status_code))
+            continue
+
+        with open(name + "_temp", "wb") as file:
+            file.write(response.content)
+
+        try:
+            remove_blank_pages(name + "_temp", name)
+            os.remove(name + "_temp")
+        except Exception as error:  # pylint: disable=broad-except
+            # keep the original file rather than losing the download
+            print("  could not strip blank pages ({}), keeping as is".format(
+                error))
+            os.replace(name + "_temp", name)
 
 
 def download():
     """Downloads past papers"""
     paper_code, start_year, end_year, to_filter = get_data_from_user()
-    subject_url = get_subject_url(paper_code)
-    years_urls = get_each_years_url(subject_url, start_year, end_year)
+    subject_urls = get_subject_urls(paper_code)
 
-    mkdir(config.DATA_FOLDER)
-    mkdir(paper_code)
+    papers, errors = {}, []
+    for subject_url in subject_urls:
+        try:
+            papers.update(get_papers(subject_url, start_year, end_year))
+        except Exception as error:  # pylint: disable=broad-except
+            print("  {}".format(error))
+            errors.append(error)
 
-    download_papers(paper_code, years_urls, to_filter)
+    if not papers:
+        raise errors[0] if errors else Exception("No papers found")
+
+    papers = filter_papers(papers, to_filter)
+    print("Found {} files".format(len(papers)))
+    download_papers(paper_code, papers)
+
 
 def merge():
     """merges past papers"""
