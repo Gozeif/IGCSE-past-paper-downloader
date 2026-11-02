@@ -1,9 +1,34 @@
 """IGCSE Past Papers Downloader"""
 import os
+import re
+
 import requests
 import bs4
 from pypdf import PdfReader, PdfWriter
 import config
+
+SESSION = requests.Session()
+SESSION.headers.update(config.HEADERS)
+
+# CIE:     0580_s19_qp_12.pdf        Edexcel: 4MA1_1H_que_20190515.pdf
+CIE_RE = re.compile(
+    r"(?P<code>\d{4})_(?P<season>[smwy])(?P<yy>\d{2})_(?P<type>[a-z]{2})"
+    r"(?:_(?P<variant>[\w-]+))?", re.IGNORECASE)
+EDEXCEL_RE = re.compile(
+    r"(?P<code>[A-Z0-9]{4,5})_(?P<paper>[0-9A-Z]+)_(?P<type>[a-z]+)_"
+    r"(?P<date>\d{8})", re.IGNORECASE)
+EDEXCEL_TYPES = {"que": "qp", "rms": "ms", "msc": "ms"}
+
+YEAR_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+MONTH_RE = (r"(?<![a-z])(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+            r"june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|"
+            r"nov(?:ember)?|dec(?:ember)?)(?![a-z])")
+MONTH_SEASON = {"jan": "j", "feb": "j", "mar": "m", "apr": "m", "may": "s",
+                "jun": "s", "jul": "s", "aug": "r", "sep": "w", "oct": "w",
+                "nov": "w", "dec": "w"}
+NUMBER_SEASON = {1: "j", 2: "j", 3: "m", 4: "m", 5: "s", 6: "s", 7: "s",
+                 8: "r", 9: "w", 10: "w", 11: "w", 12: "w"}
+HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6", "strong", "b", "summary"}
 
 
 def mkdir(name):
@@ -118,7 +143,51 @@ def get_each_years_url(subject_url, start_year, end_year):
         except AttributeError:
             pass
 
-    return output
+# --------------------------------------------------------------------------
+# Site access
+# --------------------------------------------------------------------------
+def fetch(url):
+    """GET through the shared session (keeps the password cookie)"""
+    return SESSION.get(url, timeout=config.TIMEOUT)
+
+
+def _soup(html):
+    return bs4.BeautifulSoup(html, "lxml")
+
+
+def _is_locked(soup):
+    """True if the page is showing WordPress' password form"""
+    return soup.find("input", attrs={"name": "post_password"}) is not None
+
+
+def get_password():
+    """Site password from the environment, or asked for once"""
+    if not config.SITE_PASSWORD:
+        config.SITE_PASSWORD = input("Site password: ").strip()
+    return config.SITE_PASSWORD
+
+
+def get_page(url):
+    """Fetches a page, entering the site password if the page is protected"""
+    soup = _soup(fetch(url).content)
+    if not _is_locked(soup):
+        return soup
+
+    # WordPress password form: POST it with the page as Referer; the response
+    # sets a cookie on the session which unlocks pages with that password.
+    SESSION.post(
+        config.POSTPASS_URL,
+        data={"post_password": get_password(), "Submit": "Enter"},
+        headers={"Referer": url},
+        timeout=config.TIMEOUT,
+    )
+    soup = _soup(fetch(url).content)
+    if _is_locked(soup):
+        raise Exception("{} is still locked - is the password correct for "
+                        "this page?".format(url))
+    return soup
+
+
 
 def get_papers_urls(year_url):
     """return all papers' url from a year url"""

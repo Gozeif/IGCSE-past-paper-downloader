@@ -1,10 +1,25 @@
 """Configurations For IGCSE Past Papers Downloader"""
+import os
+from dotenv import load_dotenv
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 5.1.1; SM-G928X Build/LMY47X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.83 Mobile Safari/537.36'
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    )
 }
 
+# --- Site ---------------------------------------------------------------
+SITE_URL = "https://dynamicpapers.com/"
+POSTPASS_URL = "https://dynamicpapers.com/wp-login.php?action=postpass"
+TIMEOUT = 60
 
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+# Subject pages are password protected. You can override this with the
+# DYNAMICPAPERS_PASSWORD environment variable instead of keeping it in code.
+SITE_PASSWORD = os.environ.get("DYNAMICPAPERS_PASSWORD")
 
 # --- Folders / files ----------------------------------------------------
 DATA_FOLDER = "data"
@@ -14,7 +29,6 @@ MERGED_FOLDER = "MERGED"
 MERGED_FILE = "merged.pdf"
 MERGED_TEMP_FILE = "merged_temp.pdf"
 
-BASE_URL = "https://www.cienotes.com/cie-igcse-past-papers/"
 # --- Filtering ----------------------------------------------------------
 # File-name types that are skipped (examiner reports, grade thresholds, ...)
 BANNED_PAPER_TYPES = ["ir", "gt", "er", "pef"]
