@@ -67,20 +67,21 @@ def remove_blank_pages(input_file_name, output_file_name):
 def get_data_from_user():
     """Ask And Get Data About Subject And Dates From User"""
     to_filter = {
-        "s" : [],
-        "m" : [],
-        "w" : [],
+        "s": [],
+        "m": [],
+        "w": [],
     }
-    paper_code = input("Paper Code: ")
+    paper_code = input(config.PROMPT_FOR_CODE).strip()
     start_year = int(input("Start Year: "))
     end_year = int(input("End Year: "))
 
-    should_filter = input(config.PROMPT_FOR_FILTER) == "yes"
+    should_filter = input(config.PROMPT_FOR_FILTER).strip().lower() == "yes"
     if should_filter:
         for season in config.SEASONS:
-            if input(config.PROMPT_FOR_FILTER_IN_SEASON) == "yes":
+            answer = input(config.PROMPT_FOR_FILTER_IN_SEASON.format(season))
+            if answer.strip().lower() == "yes":
                 codes_to_filter = input(config.PROMPT_FOR_PAPER_CODE)
-                to_filter[season[0]].extend(codes_to_filter.split(" "))
+                to_filter[season[0]].extend(codes_to_filter.split())
 
     return paper_code, start_year, end_year, to_filter
 
@@ -220,6 +221,7 @@ def main():
         merge()
     else:
         download()
+
 
 if __name__ == "__main__":
     main()
