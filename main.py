@@ -200,14 +200,18 @@ def merge():
     paper_code = input("Enter Paper Code To Merge: ")
     os.chdir(config.DATA_FOLDER)
 
-    os.chdir(paper_code)
+    os.chdir(folder_name(paper_code))
     mkdir(config.MERGED_FOLDER)
 
     merger = pdf_merge(config.QUESTION_PAPERS_FOLDER)
 
     os.chdir(config.MERGED_FOLDER)
-    merger.write(config.MERGED_FILE)
-    remove_blank_pages(config.MERGED_FILE, "temo.pdf")
+    with open(config.MERGED_TEMP_FILE, "wb") as file:
+        merger.write(file)
+
+    remove_blank_pages(config.MERGED_TEMP_FILE, config.MERGED_FILE)
+    os.remove(config.MERGED_TEMP_FILE)
+
 
 def main():
     """Main Loop"""
