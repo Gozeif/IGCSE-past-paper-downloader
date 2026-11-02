@@ -484,4 +484,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:  # pylint: disable=broad-except
+        print("Error: {}".format(error))
+    input("\nPress Enter to exit...")
