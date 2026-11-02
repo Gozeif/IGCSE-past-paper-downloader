@@ -1,4 +1,4 @@
-"""Configurations For IGCSE Past Papers Downloader"""
+"""Configurations For IGCSE Past Papers Downloader (dynamicpapers.com)"""
 import os
 from dotenv import load_dotenv
 
@@ -54,7 +54,7 @@ EDEXCEL_CODES = {
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Subject pages are password protected. You can override this with the
-# DYNAMICPAPERS_PASSWORD environment variable instead of keeping it in code.
+# Set DYNAMICPAPERS_PASSWORD, or leave it unset to be prompted.
 SITE_PASSWORD = os.environ.get("DYNAMICPAPERS_PASSWORD")
 
 # --- Folders / files ----------------------------------------------------

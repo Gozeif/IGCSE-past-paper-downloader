@@ -1,4 +1,8 @@
-"""IGCSE Past Papers Downloader"""
+"""IGCSE Past Papers Downloader (source: dynamicpapers.com)
+
+Works for CIE, AQA and Edexcel subjects: type a paper code (0580, 9709, 9280,
+4MA1, ...) or part of a subject name (for example "edexcel maths").
+"""
 import os
 import re
 from urllib.parse import unquote, urljoin, urlparse
