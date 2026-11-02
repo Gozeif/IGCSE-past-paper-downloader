@@ -48,7 +48,8 @@ def folder_name(paper_code):
 def pdf_merge(folder):
     """Merges all pdfs in a folder (in name order) and returns the writer"""
     pdfs = sorted(f for f in os.listdir(folder)
-                  if os.path.isfile(os.path.join(folder, f)))
+                 if f.lower().endswith(".pdf")
+                 and os.path.isfile(os.path.join(folder, f)))
 
     merger = PdfWriter()
 
