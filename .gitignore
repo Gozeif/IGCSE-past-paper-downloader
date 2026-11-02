@@ -109,3 +109,15 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+
+# Debug
+debug_page.html
+
+# VS Code
+IGCSE-past-paper-downloader.code-workspace
+.vscode/
+
+# JetBrains IDEs
+.idea/
+*.iml
+out/
