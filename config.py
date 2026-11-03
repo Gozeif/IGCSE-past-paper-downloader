@@ -59,12 +59,14 @@ else:
 
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-# Subject pages are password protected. You can override this with the
-# Set DYNAMICPAPERS_PASSWORD, or leave it unset to be prompted.
+# Subject pages are password protected. Set the DYNAMICPAPERS_PASSWORD
+# environment variable or put the password in settings.txt; if neither is
+# set you are asked for it when it is needed.
 SITE_PASSWORD = os.environ.get("DYNAMICPAPERS_PASSWORD")
 
 # --- Folders / files ----------------------------------------------------
 DATA_FOLDER = os.path.join(BASE_DIR, "IGCSE downloads")
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.txt")
 MARK_SCHEME_FOLDER = "mark_scheme"
 QUESTION_PAPERS_FOLDER = "question_papers"
 MERGED_FOLDER = "MERGED"
@@ -85,3 +87,30 @@ PROMPT_FOR_FILTER = "Do you want to exclude certain paper code (yes or no): "
 PROMPT_FOR_FILTER_IN_SEASON = "Do you want to filter any code in {} (yes or no): "
 PROMPT_FOR_PAPER_CODE = "Which codes to filter (seperated by space): "
 PROMPT_OPERATION = "Do You Want To Download Past Papers Or Merge Them(download or merge): "
+
+SETTINGS_TEMPLATE = """\
+# IGCSE Past Paper Downloader - settings
+# Edit this file, save it, then run the program again.
+# Lines starting with # are comments.
+
+[settings]
+# What to do: download, merge, or both
+operation = download
+
+# Paper codes or subject names, separated by commas
+# (for example: 0580, 9709, 4MA1, edexcel maths)
+subjects = 0580
+
+# Year range to download (inclusive)
+start_year = 2019
+end_year = 2023
+
+# Paper variants to skip, separated by spaces. Leave empty to keep everything.
+# For example, to skip CIE practical papers: 51 52 53
+exclude_summer =
+exclude_march =
+exclude_winter =
+
+# Password for dynamicpapers.com. Leave empty to be asked when needed.
+password =
+"""

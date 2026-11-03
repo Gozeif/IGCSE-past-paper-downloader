@@ -11,6 +11,7 @@ import requests
 import bs4
 from pypdf import PdfReader, PdfWriter
 import config
+import configparser
 
 SESSION = requests.Session()
 SESSION.headers.update(config.HEADERS)
@@ -480,9 +481,50 @@ def merge():
     else:
         os.replace(config.MERGED_TEMP_FILE, config.MERGED_FILE)
 
+def load_settings():
+    """Applies settings.txt (next to the program) on top of the defaults in
+    config.py. Creates the file with defaults if it does not exist yet."""
+    path = config.SETTINGS_FILE
+    if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as file:
+            file.write(config.SETTINGS_TEMPLATE)
+        print("Created {}".format(path))
+        return
+
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        parser.read(path, encoding="utf-8-sig")  # Notepad may add a BOM
+    except configparser.Error:
+        raise ValueError("settings.txt is not formatted correctly - it must "
+                         "start with a [settings] line and use name = value "
+                         "lines") from None
+    if not parser.has_section("settings"):
+        raise ValueError("settings.txt needs a [settings] line at the top")
+    section = parser["settings"]
+
+    password = section.get("password", "").strip()
+    if password and not config.SITE_PASSWORD:      # env var wins
+        config.SITE_PASSWORD = password
+
+    folder = section.get("downloads_folder", "").strip()
+    if folder:
+        config.DATA_FOLDER = (folder if os.path.isabs(folder)
+                              else os.path.join(config.BASE_DIR, folder))
+
+    if section.get("skip_types") is not None:
+        config.BANNED_PAPER_TYPES = section.get("skip_types").lower().split()
+
+    try:
+        config.REMOVE_BLANK_PAGES = section.getboolean(
+            "remove_blank_pages", fallback=config.REMOVE_BLANK_PAGES)
+        config.TIMEOUT = int(section.get("timeout", config.TIMEOUT))
+    except ValueError:
+        raise ValueError("remove_blank_pages must be yes or no, and timeout "
+                         "must be a number") from None
 
 def main():
     """Main Loop"""
+    load_settings()
     operation = input(config.PROMPT_OPERATION)
     if operation.lower() == "merge":
         merge()
