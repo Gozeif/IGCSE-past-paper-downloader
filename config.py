@@ -70,6 +70,7 @@ QUESTION_PAPERS_FOLDER = "question_papers"
 MERGED_FOLDER = "MERGED"
 MERGED_FILE = "merged.pdf"
 MERGED_TEMP_FILE = "merged_temp.pdf"
+REMOVE_BLANK_PAGES = True
 DEBUG_HTML_FILE = os.path.join(BASE_DIR, "debug_page.html")
 
 # --- Filtering ----------------------------------------------------------

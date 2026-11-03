@@ -425,6 +425,10 @@ def download_papers(paper_code, papers):
         with open(name + "_temp", "wb") as file:
             file.write(response.content)
 
+        if not config.REMOVE_BLANK_PAGES:
+            os.replace(name + "_temp", name)
+            continue
+
         try:
             remove_blank_pages(name + "_temp", name)
             os.remove(name + "_temp")
@@ -470,8 +474,11 @@ def merge():
     with open(config.MERGED_TEMP_FILE, "wb") as file:
         merger.write(file)
 
-    remove_blank_pages(config.MERGED_TEMP_FILE, config.MERGED_FILE)
-    os.remove(config.MERGED_TEMP_FILE)
+    if config.REMOVE_BLANK_PAGES:
+        remove_blank_pages(config.MERGED_TEMP_FILE, config.MERGED_FILE)
+        os.remove(config.MERGED_TEMP_FILE)
+    else:
+        os.replace(config.MERGED_TEMP_FILE, config.MERGED_FILE)
 
 
 def main():
