@@ -90,27 +90,22 @@ PROMPT_OPERATION = "Do You Want To Download Past Papers Or Merge Them(download o
 
 SETTINGS_TEMPLATE = """\
 # IGCSE Past Paper Downloader - settings
-# Edit this file, save it, then run the program again.
-# Lines starting with # are comments.
+# Lines starting with # are comments. Save this file after editing it.
 
 [settings]
-# What to do: download, merge, or both
-operation = download
-
-# Paper codes or subject names, separated by commas
-# (for example: 0580, 9709, 4MA1, edexcel maths)
-subjects = 0580
-
-# Year range to download (inclusive)
-start_year = 2019
-end_year = 2023
-
-# Paper variants to skip, separated by spaces. Leave empty to keep everything.
-# For example, to skip CIE practical papers: 51 52 53
-exclude_summer =
-exclude_march =
-exclude_winter =
-
-# Password for dynamicpapers.com. Leave empty to be asked when needed.
+# Password for dynamicpapers.com. Leave empty to be asked when it is needed.
 password =
+
+# Where papers are saved. A plain name is created next to the program.
+downloads_folder = IGCSE downloads
+
+# File types that are never downloaded (examiner reports, grade thresholds...)
+# Separate with spaces. Leave empty to download everything.
+skip_types = ir gt er pef
+
+# Remove "BLANK PAGE" pages from downloaded and merged PDFs (yes or no)
+remove_blank_pages = yes
+
+# Seconds to wait for the site before giving up on a request
+timeout = 60
 """

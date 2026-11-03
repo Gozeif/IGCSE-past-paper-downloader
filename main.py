@@ -511,8 +511,9 @@ def load_settings():
         config.DATA_FOLDER = (folder if os.path.isabs(folder)
                               else os.path.join(config.BASE_DIR, folder))
 
-    if section.get("skip_types") is not None:
-        config.BANNED_PAPER_TYPES = section.get("skip_types").lower().split()
+    skip_types = section.get("skip_types")
+    if skip_types is not None:
+        config.BANNED_PAPER_TYPES = skip_types.lower().split()
 
     try:
         config.REMOVE_BLANK_PAGES = section.getboolean(
